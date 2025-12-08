@@ -35,6 +35,11 @@ async function run() {
             res.send(result);
         });
 
+           app.get('/meals/all', async (req, res) => {
+            const result = await mealsCollection.find().toArray();
+            res.send(result);
+        });
+
         //  Add a meal
         app.post('/meals', async (req, res) => {
             const meal = req.body;

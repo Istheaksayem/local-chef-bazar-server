@@ -3,7 +3,7 @@ const cors = require('cors');
 const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // middleware
 app.use(cors());
@@ -21,13 +21,13 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        
+
         await client.connect();
         console.log("MongoDB Connected Successfully!");
 
         const db = client.db('chef_bazar_db');
         const mealsCollection = db.collection('meals');
-        const reviewsCollection =db.collection('reviews')
+        const reviewsCollection = db.collection('reviews')
 
         //  Get meals with limit (default 6)
         app.get('/meals', async (req, res) => {
@@ -36,10 +36,25 @@ async function run() {
             res.send(result);
         });
 
-           app.get('/meals/all', async (req, res) => {
+        app.get('/meals/all', async (req, res) => {
             const result = await mealsCollection.find().toArray();
             res.send(result);
         });
+
+        // GET Meal Details by ID (For Details Page)
+        app.get('/meals/:id',async(req,res) =>{
+            const id =req.params.id;
+            const query ={_id:id};
+
+            const meal =await mealsCollection.findOne(query)
+            if(!meal){
+                return res.status(404).send({message:"Meal Not Found"})
+
+            }
+            res.send(meal)
+        })
+      
+
 
         //  Add a meal
         app.post('/meals', async (req, res) => {
@@ -49,14 +64,14 @@ async function run() {
         });
 
         // get all reviews
-        app.get('/reviews',async(req,res) =>{
-            const result =await reviewsCollection.find().toArray();
+        app.get('/reviews', async (req, res) => {
+            const result = await reviewsCollection.find().toArray();
             res.send(result)
         })
         // add a review
-        app.post('/reviews',async(req,res) =>{
-            const review =req.body;
-            const result= await reviewsCollection.insertOne(review)
+        app.post('/reviews', async (req, res) => {
+            const review = req.body;
+            const result = await reviewsCollection.insertOne(review)
             res.send(result)
         })
 

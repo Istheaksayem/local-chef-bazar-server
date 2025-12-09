@@ -27,6 +27,7 @@ async function run() {
 
         const db = client.db('chef_bazar_db');
         const mealsCollection = db.collection('meals');
+        const reviewsCollection =db.collection('reviews')
 
         //  Get meals with limit (default 6)
         app.get('/meals', async (req, res) => {
@@ -46,6 +47,18 @@ async function run() {
             const result = await mealsCollection.insertOne(meal);
             res.send(result);
         });
+
+        // get all reviews
+        app.get('/reviews',async(req,res) =>{
+            const result =await reviewsCollection.find().toArray();
+            res.send(result)
+        })
+        // add a review
+        app.post('/reviews',async(req,res) =>{
+            const review =req.body;
+            const result= await reviewsCollection.insertOne(review)
+            res.send(result)
+        })
 
     } catch (error) {
         console.log(error);

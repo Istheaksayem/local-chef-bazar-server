@@ -27,7 +27,8 @@ async function run() {
         const db = client.db('chef_bazar_db');
         const mealsCollection = db.collection('meals');
         const reviewsCollection = db.collection('reviews');
-        const favoritesCollection =db.collection('favorites')
+        const favoritesCollection = db.collection('favorites')
+        const ordersCollection = db.collection("orders")
 
         // ============================
         //        MEALS API
@@ -109,7 +110,7 @@ async function run() {
 
 
         // add a favorites
-        app.post('/favorites',async(req,res) =>{
+        app.post('/favorites', async (req, res) => {
             const { userEmail, mealId, mealName, chefId, chefName, price } = req.body;
 
             //  already exists check
@@ -119,25 +120,41 @@ async function run() {
                 return res.send({ success: false, message: "Already added to favorites!" });
             }
 
-            const favData={
+            const favData = {
                 userEmail,
                 mealId,
                 mealName,
                 chefId,
                 chefName,
                 price,
-                addedTime:new Date()
+                addedTime: new Date()
             }
-            const result =await favoritesCollection.insertOne(favData)
+            const result = await favoritesCollection.insertOne(favData)
             res.send({ success: true, message: "Added to favorites!", result });
         })
-        app.get('/favorites/:email',async(req,res) =>{
-            const email =req.params.email;
-            const result=await favoritesCollection.find({userEmail:email}).toArray();
+        app.get('/favorites/:email', async (req, res) => {
+            const email = req.params.email;
+            const result = await favoritesCollection.find({ userEmail: email }).toArray();
             res.send(result)
         })
 
+        // ============================
+        //     ORDERS API
+        // =============================
 
+        // add order
+        app.post('/orders',async(req,res) =>{
+            const order =req.body;
+            const result =await ordersCollection.insertOne(order)
+            res.send(result)
+        })
+
+        // get order of user
+         app.get("/orders/:email", async (req, res) => {
+            const email = req.params.email;
+            const result = await ordersCollection.find({ userEmail: email }).toArray();
+            res.send(result);
+        });
     } catch (error) {
         console.log(error);
     }

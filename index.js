@@ -27,6 +27,7 @@ async function run() {
         const db = client.db('chef_bazar_db');
         const mealsCollection = db.collection('meals');
         const reviewsCollection = db.collection('reviews');
+        const favoritesCollection =db.collection('favorites')
 
         // ============================
         //        MEALS API
@@ -101,6 +102,41 @@ async function run() {
 
             res.send(result);
         });
+
+        // ===============================
+        //       FAVORITES API
+        // ===============================
+
+
+        // add a favorites
+        app.post('/favorites',async(req,res) =>{
+            const { userEmail, mealId, mealName, chefId, chefName, price } = req.body;
+
+            //  already exists check
+            const exists = await favoritesCollection.findOne({ userEmail, mealId });
+
+            if (exists) {
+                return res.send({ success: false, message: "Already added to favorites!" });
+            }
+
+            const favData={
+                userEmail,
+                mealId,
+                mealName,
+                chefId,
+                chefName,
+                price,
+                addedTime:new Date()
+            }
+            const result =await favoritesCollection.insertOne(favData)
+            res.send({ success: true, message: "Added to favorites!", result });
+        })
+        app.get('/favorites/:email',async(req,res) =>{
+            const email =req.params.email;
+            const result=await favoritesCollection.find({userEmail:email}).toArray();
+            res.send(result)
+        })
+
 
     } catch (error) {
         console.log(error);

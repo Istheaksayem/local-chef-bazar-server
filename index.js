@@ -30,6 +30,8 @@ async function run() {
         const favoritesCollection = db.collection('favorites')
         const ordersCollection = db.collection("orders")
 
+         const userRequestsCollection = db.collection("userRequests");
+
         // ============================
         //        MEALS API
         // ============================
@@ -155,6 +157,41 @@ async function run() {
             const result = await ordersCollection.find({ userEmail: email }).toArray();
             res.send(result);
         });
+         // ===============================
+        //   NEW ROLE REQUEST API
+        // ===============================
+
+        // Send Role Request
+        app.post("/request-role", async (req, res) => {
+            const { userName, userEmail, requestType } = req.body;
+
+            if (!userName || !userEmail || !requestType) {
+                return res.status(400).send({ message: "Invalid Request Data" });
+            }
+
+            const requestData = {
+                userName,
+                userEmail,
+                requestType,
+                requestStatus: "pending",
+                requestTime: new Date()
+            };
+
+            const result = await userRequestsCollection.insertOne(requestData);
+
+            res.send({
+                success: true,
+                message: "Role request sent successfully!",
+                result
+            });
+        });
+
+        // Get All Requests (Admin)
+        app.get("/request-role", async (req, res) => {
+            const result = await userRequestsCollection.find().toArray();
+            res.send(result);
+        });
+
     } catch (error) {
         console.log(error);
     }

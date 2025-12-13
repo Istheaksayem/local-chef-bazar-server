@@ -3,7 +3,9 @@ const cors = require('cors');
 const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.STRIPE_SCERET);
+
 
 // middleware
 app.use(cors());
@@ -30,7 +32,8 @@ async function run() {
         const favoritesCollection = db.collection('favorites')
         const ordersCollection = db.collection("orders")
 
-         const userRequestsCollection = db.collection("userRequests");
+        const userRequestsCollection = db.collection("userRequests");
+        const paymentCollection = db.collection("payments");
 
         // ============================
         //        MEALS API
@@ -99,12 +102,42 @@ async function run() {
         // Add a review
         app.post('/reviews', async (req, res) => {
             const review = req.body;
+            
             review.date = new Date();  // auto date
 
             const result = await reviewsCollection.insertOne(review);
 
             res.send(result);
         });
+
+        // Get reviews by user email
+        app.get('/reviews/user/:email', async (req, res) => {
+            const { email } = req.params;
+            const reviews = await reviewsCollection.find({ userEmail: email }).toArray();
+            res.send(reviews);
+        });
+
+        // Delete review
+        app.delete('/reviews/:id', async (req, res) => {
+            const { id } = req.params;
+            const result = await reviewsCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result);
+        });
+
+        // Update review
+        app.patch('/reviews/:id', async (req, res) => {
+            const { id } = req.params;
+            const updatedData = req.body;
+            const result = await reviewsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updatedData }
+            );
+            res.send(result);
+        });
+
+
+
+
 
         // ===============================
         //       FAVORITES API
@@ -139,26 +172,47 @@ async function run() {
             const result = await favoritesCollection.find({ userEmail: email }).toArray();
             res.send(result)
         })
+        // delete favorite
+        app.delete("/favorites/:id",async(req,res) =>{
+            const id =req.params.id;
+
+            const result =await favoritesCollection.deleteOne({
+                _id:new ObjectId(id)
+            })
+            res.send(result)
+        })
 
         // ============================
         //     ORDERS API
         // =============================
 
         // add order
-        app.post('/orders',async(req,res) =>{
-            const order =req.body;
-            const result =await ordersCollection.insertOne(order)
+        app.post('/orders', async (req, res) => {
+            const order = req.body;
+            const result = await ordersCollection.insertOne(order)
             res.send(result)
         })
 
         // get order of user
-         app.get("/orders/:email", async (req, res) => {
+        app.get("/orders/:email", async (req, res) => {
             const email = req.params.email;
             const result = await ordersCollection.find({ userEmail: email }).toArray();
             res.send(result);
         });
-         // ===============================
-        //   NEW ROLE REQUEST API
+        // Get all orders for a specific user
+        app.get("/orders/user/:email", async (req, res) => {
+            const email = req.params.email;
+
+            const result = await ordersCollection
+                .find({ userEmail: email })
+                .sort({ orderTime: -1 })
+                .toArray();
+
+            res.send(result);
+        });
+
+        // ===============================
+        //   NEW USER ROLE REQUEST API
         // ===============================
 
         // Send Role Request
@@ -191,6 +245,46 @@ async function run() {
             const result = await userRequestsCollection.find().toArray();
             res.send(result);
         });
+
+        // app.post("/create-checkout-session", async (req, res) => {
+        //     const { mealName, price, quantity, _id } = req.body;
+
+        //     const session = await stripe.checkout.sessions.create({
+        //         payment_method_types: ["card"],
+        //         mode: "payment",
+
+        //         line_items: [
+        //             {
+        //                 price_data: {
+        //                     currency: "usd",
+        //                     product_data: {
+        //                         name: mealName,
+        //                     },
+        //                     unit_amount: price * 100,
+        //                 },
+        //                 quantity: quantity,
+        //             },
+        //         ],
+
+        //         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+        //         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+        //     });
+
+        //     res.send({ url: session.url });
+        // });
+
+        // app.patch("/orders/payment/:id", async (req, res) => {
+        //     const id = req.params.id;
+
+        //     const result = await ordersCollection.updateOne(
+        //         { _id: new ObjectId(id) },
+        //         { $set: { paymentStatus: "paid" } }
+        //     );
+
+        //     res.send(result);
+        // });
+
+
 
     } catch (error) {
         console.log(error);

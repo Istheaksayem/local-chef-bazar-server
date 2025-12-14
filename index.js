@@ -71,6 +71,41 @@ async function run() {
             const result = await mealsCollection.insertOne(meal);
             res.send(result);
         });
+        app.get("/my-meals", async (req, res) => {
+            const email = req.query.email
+
+            if (!email) {
+                return res.status(400).send({ message: "Email required" })
+            }
+            const result = await mealsCollection.find.toArray()
+            res.send(result)
+        })
+
+        // Delete meal
+        app.delete('/meals/:id', async (req, res) => {
+            const id = req.params.id;
+
+            const result = await mealsCollection.deleteOne({
+                _id: new ObjectId(id)
+            });
+
+            res.send(result);
+        });
+
+        // Update meal
+        app.put('/meals/:id', async (req, res) => {
+            const id = req.params.id;
+            const updatedMeal = req.body;
+
+            const result = await mealsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updatedMeal }
+            );
+
+            res.send(result);
+        });
+
+
 
         // ============================
         //       REVIEW API
@@ -102,7 +137,7 @@ async function run() {
         // Add a review
         app.post('/reviews', async (req, res) => {
             const review = req.body;
-            
+
             review.date = new Date();  // auto date
 
             const result = await reviewsCollection.insertOne(review);
@@ -173,11 +208,11 @@ async function run() {
             res.send(result)
         })
         // delete favorite
-        app.delete("/favorites/:id",async(req,res) =>{
-            const id =req.params.id;
+        app.delete("/favorites/:id", async (req, res) => {
+            const id = req.params.id;
 
-            const result =await favoritesCollection.deleteOne({
-                _id:new ObjectId(id)
+            const result = await favoritesCollection.deleteOne({
+                _id: new ObjectId(id)
             })
             res.send(result)
         })

@@ -4,6 +4,7 @@ const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const e = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SCERET);
 
 
@@ -27,6 +28,7 @@ async function run() {
         console.log("MongoDB Connected Successfully!");
 
         const db = client.db('chef_bazar_db');
+        const userCollection = db.collection('users')
         const mealsCollection = db.collection('meals');
         const reviewsCollection = db.collection('reviews');
         const favoritesCollection = db.collection('favorites')
@@ -34,6 +36,23 @@ async function run() {
 
         const userRequestsCollection = db.collection("userRequests");
         const paymentCollection = db.collection("payments");
+
+        // ============================
+        //        USERS API
+        // ============================
+        app.post("/users", async (req, res) => {
+            const user = req.body;
+
+            const exists = await userCollection.findOne({ email: user.email });
+
+            if (exists) {
+                return res.send({ message: "User already exists" });
+            }
+
+            const result = await userCollection.insertOne(user);
+            res.send(result);
+        });
+
 
         // ============================
         //        MEALS API
@@ -53,11 +72,11 @@ async function run() {
         });
 
         // Get meal details by ID
-        app.get('/meals/:id', async (req, res) => {
+        app.get('/meals-details/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id: id };
+            const query = { _id: new ObjectId(id) };
             const meal = await mealsCollection.findOne(query);
-
+            // console.log(meal)
             if (!meal) {
                 return res.status(404).send({ message: "Meal Not Found" });
             }
@@ -224,6 +243,7 @@ async function run() {
         // add order
         app.post('/orders', async (req, res) => {
             const order = req.body;
+            console.log(order)
             const result = await ordersCollection.insertOne(order)
             res.send(result)
         })
@@ -245,12 +265,127 @@ async function run() {
 
             res.send(result);
         });
+        // get orders for specific chef
+        app.get("/orders/chef/:chefId", async (req, res) => {
+            const chefId = req.params.chefId;
+
+            const result = await ordersCollection
+                .find({ chefId })
+                .sort({ orderTime: -1 })
+                .toArray();
+
+            res.send(result);
+        });
+
+        app.patch("/orders/status/:id", async (req, res) => {
+            const id = req.params.id;
+            const { status } = req.body;
+
+            const result = await ordersCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { orderStatus: status } }
+            );
+
+            res.send(result);
+        });
+        // payment
+        app.get('/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await ordersCollection.findOne(query);
+            res.send(result)
+        })
+
+
+
+        // payment related 
+        app.post("/payment-checkout-session", async (req, res) => {
+            const paymentInfo = req.body;
+
+            const amount = parseInt(paymentInfo.price) * 100
+
+            const session = await stripe.checkout.sessions.create({
+                line_items: [
+                    {
+                        // Provide the exact Price ID (for example, price_1234) of the product you want to sell
+                        price_data: {
+                            currency: 'USD',
+                            product_data: {
+                                name: `please pay for :${paymentInfo.orderName}`
+                            },
+                            unit_amount: amount,
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                metadata: {
+                    orderId: paymentInfo.orderId
+                },
+
+                customer_email: paymentInfo.userEmail,
+                success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+            })
+            console.log(session)
+            res.send({ url: session.url })
+        })
+
+
+
+        // old
+        // app.post('/create-checkout-session', async (req, res) => {
+        //     const paymentInfo = req.body;
+        //     const amount =parseInt(paymentInfo.price)*100 
+
+
+        //     const session = await stripe.checkout.sessions.create({
+        //         line_items: [
+        //             {
+        //                 // Provide the exact Price ID (for example, price_1234) of the product you want to sell
+        //                 price_data:{
+        //                     currency:'USD',
+        //                     product_data:{
+        //                         name:'Meal Payment'
+        //                     },
+        //                     unit_amount:amount,
+        //                 },
+        //                 quantity: 1,
+        //             },
+        //         ],
+        //         mode: 'payment',
+        //         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+        //         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+        //     })
+        //     console.log(session)
+        //     res.send({url:session.url})
+        // })
 
         // ===============================
         //   NEW USER ROLE REQUEST API
         // ===============================
 
         // Send Role Request
+      app.patch("/payment-success",async(req,res) =>{
+        const sessionId =req.body.session_id;
+        
+        const session =await stripe.checkout.sessions.retrieve(sessionId)
+        console.log("session retrieve",session)
+        if(session.payment_status ==='paid'){
+            const id =session.metadata.orderId;
+            const query ={_id:new ObjectId(id)}
+            const update ={
+                $set:{
+                    paymentStatus:'paid',
+
+                }
+            }
+            const result =await ordersCollection.updateOne(query,update)
+            res.send(result)
+        }
+        res.send({success:false})
+      })
+      
         app.post("/request-role", async (req, res) => {
             const { userName, userEmail, requestType } = req.body;
 
@@ -280,44 +415,6 @@ async function run() {
             const result = await userRequestsCollection.find().toArray();
             res.send(result);
         });
-
-        // app.post("/create-checkout-session", async (req, res) => {
-        //     const { mealName, price, quantity, _id } = req.body;
-
-        //     const session = await stripe.checkout.sessions.create({
-        //         payment_method_types: ["card"],
-        //         mode: "payment",
-
-        //         line_items: [
-        //             {
-        //                 price_data: {
-        //                     currency: "usd",
-        //                     product_data: {
-        //                         name: mealName,
-        //                     },
-        //                     unit_amount: price * 100,
-        //                 },
-        //                 quantity: quantity,
-        //             },
-        //         ],
-
-        //         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
-        //         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
-        //     });
-
-        //     res.send({ url: session.url });
-        // });
-
-        // app.patch("/orders/payment/:id", async (req, res) => {
-        //     const id = req.params.id;
-
-        //     const result = await ordersCollection.updateOne(
-        //         { _id: new ObjectId(id) },
-        //         { $set: { paymentStatus: "paid" } }
-        //     );
-
-        //     res.send(result);
-        // });
 
 
 

@@ -320,7 +320,8 @@ async function run() {
                 ],
                 mode: 'payment',
                 metadata: {
-                    orderId: paymentInfo.orderId
+                    orderId: paymentInfo.orderId,
+                    orderName: paymentInfo.orderName
                 },
 
                 customer_email: paymentInfo.userEmail,
@@ -366,26 +367,53 @@ async function run() {
         // ===============================
 
         // Send Role Request
-      app.patch("/payment-success",async(req,res) =>{
-        const sessionId =req.body.session_id;
-        
-        const session =await stripe.checkout.sessions.retrieve(sessionId)
-        console.log("session retrieve",session)
-        if(session.payment_status ==='paid'){
-            const id =session.metadata.orderId;
-            const query ={_id:new ObjectId(id)}
-            const update ={
-                $set:{
-                    paymentStatus:'paid',
+        app.patch("/payment-success", async (req, res) => {
+            const sessionId = req.body.session_id;
 
+            const session = await stripe.checkout.sessions.retrieve(sessionId)
+            console.log("session retrieve", session)
+            if (session.payment_status === 'paid') {
+                const id = session.metadata.orderId;
+                const query = { _id: new ObjectId(id) }
+                const update = {
+                    $set: {
+                        paymentStatus: 'paid',
+
+                    }
                 }
+                const result = await ordersCollection.updateOne(query, update)
+                const payment = {
+                    amount: session.amount_total / 100,
+                    currency: session.currency,
+                    customerEmail: session.customer_email,
+                    orderId: session.metadata.orderId,
+                    transactionId: session.payment_intent,
+                    orderName: session.metadata.orderName,
+                    paymentStatus: session.payment_status,
+                    paidAt: new Date()
+                }
+
+                if (session.payment_status === 'paid') {
+                    const resultPayment = await paymentCollection.insertOne(payment)
+                    res.send({ success: true, modifyOrder: result, paymentInfo: resultPayment })
+                }
+
             }
-            const result =await ordersCollection.updateOne(query,update)
-            res.send(result)
-        }
-        res.send({success:false})
-      })
-      
+            res.send({ success: false })
+        })
+
+        app.get("/payments/:email", async (req, res) => {
+            const email = req.params.email;
+
+            const result = await paymentCollection
+                .find({ customerEmail: email })
+                .sort({ paidAt: -1 }) 
+                .toArray();
+
+            res.send(result);
+        });
+
+
         app.post("/request-role", async (req, res) => {
             const { userName, userEmail, requestType } = req.body;
 

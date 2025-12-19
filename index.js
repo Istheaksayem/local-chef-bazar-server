@@ -45,13 +45,45 @@ async function run() {
 
             const exists = await userCollection.findOne({ email: user.email });
 
+
             if (exists) {
                 return res.send({ message: "User already exists" });
             }
 
+            user.role = "user";
+            user.status = "active"
+
             const result = await userCollection.insertOne(user);
             res.send(result);
         });
+
+
+
+        app.get("/users/role/:email", async (req, res) => {
+            const email = req.params.email;
+
+            const user = await userCollection.findOne({ email })
+            res.send({ role: user?.role || "user" })
+        })
+
+        app.get("/users", async (req, res) => {
+            const result = await userCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.patch("/users/fraud/:id", async (req, res) => {
+            const id = req.params.id;
+
+            const result = await userCollection.updateOne(
+                { _id: new ObjectId(id) },
+                {
+                    $set: {
+                        status: "fraud"
+                    }
+                }
+            )
+            res.send(result);
+        })
 
 
         // ============================
@@ -87,6 +119,12 @@ async function run() {
         // Add a meal
         app.post('/meals', async (req, res) => {
             const meal = req.body;
+            const chef = await userCollection.findOne({ email: meal.chefEmail })
+            if (chef?.status === "fraud") {
+                return res.status(403).send({
+                    message: "Fraud chefs cannot create meals"
+                });
+            }
             const result = await mealsCollection.insertOne(meal);
             res.send(result);
         });
@@ -244,6 +282,13 @@ async function run() {
         app.post('/orders', async (req, res) => {
             const order = req.body;
             console.log(order)
+
+            const user = await userCollection.findOne({ email: order.userEmail })
+            if (user?.status === "fraud") {
+                return res.status(403).send({
+                    message: "fraud users cannot place orders"
+                })
+            }
             const result = await ordersCollection.insertOne(order)
             res.send(result)
         })
@@ -295,6 +340,8 @@ async function run() {
             const result = await ordersCollection.findOne(query);
             res.send(result)
         })
+
+
 
 
 
@@ -407,7 +454,7 @@ async function run() {
 
             const result = await paymentCollection
                 .find({ customerEmail: email })
-                .sort({ paidAt: -1 }) 
+                .sort({ paidAt: -1 })
                 .toArray();
 
             res.send(result);
@@ -416,10 +463,6 @@ async function run() {
 
         app.post("/request-role", async (req, res) => {
             const { userName, userEmail, requestType } = req.body;
-
-            if (!userName || !userEmail || !requestType) {
-                return res.status(400).send({ message: "Invalid Request Data" });
-            }
 
             const requestData = {
                 userName,
@@ -430,12 +473,7 @@ async function run() {
             };
 
             const result = await userRequestsCollection.insertOne(requestData);
-
-            res.send({
-                success: true,
-                message: "Role request sent successfully!",
-                result
-            });
+            res.send({ success: true, result });
         });
 
         // Get All Requests (Admin)
@@ -443,6 +481,92 @@ async function run() {
             const result = await userRequestsCollection.find().toArray();
             res.send(result);
         });
+
+        // approve chef request
+        app.patch("/request-role/approve/:id", async (req, res) => {
+            const id = req.params.id;
+            const { email } = req.body;
+
+            const request = await userRequestsCollection.findOne({
+                _id: new ObjectId(id)
+            });
+            if (!request) {
+                return res.status(404).send({ message: "Request not found" })
+            }
+
+            // chef id generate 
+            let updateUserData = {};
+
+            if (request.requestType === "chef") {
+                const chefId = "chef-" + Math.floor(1000 + Math.random() * 9000)
+                updateUserData = {
+                    role: "chef",
+                    chefId
+                }
+            }
+            if (request.requestType === "admin") {
+                updateUserData = {
+                    role: "admin"
+                }
+            }
+
+            // update user role
+            await userCollection.updateOne(
+                { email },
+                { $set: updateUserData }
+            );
+
+            // update request status
+            await userRequestsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { requestStatus: "approved" } }
+            );
+
+            res.send({ success: true, message: "Request approved" });
+        });
+        app.patch("/request-role/reject/:id", async (req, res) => {
+            const id = req.params.id;
+
+            await userRequestsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { requestStatus: "rejected" } }
+            );
+
+            res.send({ success: true, message: "Request rejected" });
+        });
+
+        
+        //   PLATFORM STATISTICS (ADMIN)
+        app.get("/admin/platform-stats", async (req, res) => {
+            try {
+                const totalUsers = await userCollection.countDocuments();
+
+                const pendingOrders = await ordersCollection.countDocuments({
+                    orderStatus: { $ne: "delivered" }
+                });
+
+                const deliveredOrders = await ordersCollection.countDocuments({
+                    orderStatus: "delivered"
+                });
+
+                const payments = await paymentCollection.find().toArray();
+                const totalPaymentAmount = payments.reduce(
+                    (sum, p) => sum + (p.amount || 0),
+                    0
+                );
+
+                res.send({
+                    totalUsers,
+                    pendingOrders,
+                    deliveredOrders,
+                    totalPaymentAmount
+                });
+            } catch (err) {
+                res.status(500).send({ message: "Failed to load stats" });
+            }
+        });
+
+
 
 
 

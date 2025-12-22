@@ -84,6 +84,11 @@ async function run() {
             )
             res.send(result);
         })
+        // app.get("/users/:email", async (req, res) => {
+        //     const email = req.params.email;
+        //     const user = await userCollection.findOne({ email });
+        //     res.send(user);
+        // });
 
 
         // ============================
@@ -311,19 +316,37 @@ async function run() {
             res.send(result);
         });
         // get orders for specific chef
-        app.get("/orders/chef/:chefId", async (req, res) => {
-            const chefId = req.params.chefId;
 
-            const result = await ordersCollection
-                .find({ chefId })
-                .sort({ orderTime: -1 })
-                .toArray();
+        app.get("/chef-orders/:chefId",async(req,res) =>{
+            const id=req.params.chefId
+            const orders =await ordersCollection.find({chefId:id}).toArray()
 
-            res.send(result);
+            res.send(orders)
+        })
+
+        // app.get("/orders/chef/:chefId", async (req, res) => {
+        //     const chefId = req.params.chefId;
+
+        //     const result = await ordersCollection
+        //         .find({ chefId })
+        //         .sort({ orderTime: -1 })
+        //         .toArray();
+
+        //     res.send(result);
+        // });
+
+
+        app.get("/users/:email", async (req, res) => {
+            const email = req.params.email;
+            const user = await userCollection.findOne({ email });
+            res.send(user);
         });
 
-        app.patch("/orders/status/:id", async (req, res) => {
-            const id = req.params.id;
+        
+
+
+        app.patch("/orders/:id", async (req, res) => {
+            const {id}= req.params.id;
             const { status } = req.body;
 
             const result = await ordersCollection.updateOne(
@@ -331,7 +354,7 @@ async function run() {
                 { $set: { orderStatus: status } }
             );
 
-            res.send(result);
+            res.send({success:true});
         });
         // payment
         app.get('/order/:id', async (req, res) => {
@@ -535,7 +558,7 @@ async function run() {
             res.send({ success: true, message: "Request rejected" });
         });
 
-        
+
         //   PLATFORM STATISTICS (ADMIN)
         app.get("/admin/platform-stats", async (req, res) => {
             try {

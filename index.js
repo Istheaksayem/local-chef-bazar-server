@@ -319,7 +319,7 @@ async function run() {
 
         app.get("/chef-orders/:chefId",async(req,res) =>{
             const id=req.params.chefId
-            const orders =await ordersCollection.find({chefId:id}).toArray()
+            const orders =await ordersCollection.find({chefEmail:id}).toArray()
 
             res.send(orders)
         })

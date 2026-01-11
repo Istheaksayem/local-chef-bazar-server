@@ -24,7 +24,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        await client.connect();
+        // await client.connect();
         console.log("MongoDB Connected Successfully!");
 
         const db = client.db('chef_bazar_db');
@@ -134,15 +134,22 @@ async function run() {
             res.send(result);
         });
         app.get("/my-meals", async (req, res) => {
-            const email = req.query.email
+            const email = req.query.email;
 
             if (!email) {
-                return res.status(400).send({ message: "Email required" })
+                return res.status(400).send({ message: "Email required" });
             }
-            const result = await mealsCollection.find.toArray()
-            res.send(result)
-        })
 
+            // filter by chefEmail
+            const query = { chefEmail: email };
+          
+
+            const result = await mealsCollection.find(query).toArray();
+            res.send(result);
+           
+        });
+
+           
         // Delete meal
         app.delete('/meals/:id', async (req, res) => {
             const id = req.params.id;
@@ -317,9 +324,9 @@ async function run() {
         });
         // get orders for specific chef
 
-        app.get("/chef-orders/:chefId",async(req,res) =>{
-            const id=req.params.chefId
-            const orders =await ordersCollection.find({chefEmail:id}).toArray()
+        app.get("/chef-orders/:chefId", async (req, res) => {
+            const id = req.params.chefId
+            const orders = await ordersCollection.find({ chefEmail: id }).toArray()
 
             res.send(orders)
         })
@@ -342,11 +349,11 @@ async function run() {
             res.send(user);
         });
 
-        
+
 
 
         app.patch("/orders/:id", async (req, res) => {
-            const {id}= req.params.id;
+            const { id } = req.params.id;
             const { status } = req.body;
 
             const result = await ordersCollection.updateOne(
@@ -354,7 +361,7 @@ async function run() {
                 { $set: { orderStatus: status } }
             );
 
-            res.send({success:true});
+            res.send({ success: true });
         });
         // payment
         app.get('/order/:id', async (req, res) => {

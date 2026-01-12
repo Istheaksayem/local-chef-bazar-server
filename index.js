@@ -9,7 +9,11 @@ const stripe = require('stripe')(process.env.STRIPE_SCERET);
 
 
 // middleware
-app.use(cors());
+app.use(cors(
+    {
+        origin:["http://localhost:5173","https://dynamic-halva-2b4012.netlify.app"]
+    }
+));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ba90y0b.mongodb.net/?appName=Cluster0`;

@@ -378,6 +378,7 @@ async function run() {
         // payment related 
         app.post("/payment-checkout-session", async (req, res) => {
             const paymentInfo = req.body;
+            // console.log(paymentInfo)
 
             const amount = parseInt(paymentInfo.price) * 100
 
